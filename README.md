@@ -2,6 +2,21 @@
 
 A visualization tool for ROS 2 control systems that displays the connections between controllers, broadcasters, and hardware interfaces as an interactive graph.
 
+## Architecture
+
+```mermaid
+graph TD
+    A[ROS 2 Control] --> B(Data Collection);
+    B --> C{rclnodejs Bridge};
+    C --> D[WebSocket];
+    D --> E(Next.js Frontend);
+    E --> F[User Interface];
+    F -- User Interaction --> E;
+    E -- Control Commands --> D;
+    D --> C;
+    C --> B;
+```
+
 ## 1. Introduction to ROS 2 and Graph Visualization
 
 ### What is ROS 2?
@@ -38,7 +53,9 @@ Key features:
 ROS-2-Control-Ecosystem-Visualization/
 ├── ros_packages/               # ROS 2 packages
 │   ├── graph_interfaces/       # Custom message and service definitions
-│   └── graph_publisher/        # Sample publisher node for testing
+│   ├── graph_publisher/        # Sample publisher node for testing
+│   ├── topic_service_client/   # Topic subscriber and service client
+│   └── service_provider/       # Service provider for testing
 └── frontend/                   # Next.js web application
 ```
 
@@ -127,6 +144,24 @@ http://localhost:3000
 3. Watch as new connections are published every 5 seconds (if you're running the test publisher)
 4. Try adding manual connections using the form
 
+### 5. Testing the topic subscriber and service client
+
+In separate terminals:
+
+```bash
+# Terminal 1: Start the service provider
+source ~/ros2_graph_ws/install/setup.bash
+ros2 run service_provider service_provider
+
+# Terminal 2: Start the topic subscriber and service client
+source ~/ros2_graph_ws/install/setup.bash
+ros2 run topic_service_client topic_service_client
+
+# Terminal 3: Publish a test message
+source ~/ros2_graph_ws/install/setup.bash
+ros2 topic pub --once /input_topic std_msgs/msg/String "data: '10 20'"
+```
+
 ## Testing with Command Line
 
 You can also publish custom messages from the command line for testing:
@@ -164,20 +199,7 @@ graph_interfaces/GraphConnection[] connections
 
 If you encounter issues with rclnodejs:
 
-1. Make sure you have the correct Node.js version (v16+ recommended)
-2. Check that your ROS 2 environment is properly sourced
-3. Try rebuilding rclnodejs:
-
 ```bash
 cd ~/ROS-2-Control-Ecosystem-Visualization/frontend
 npm rebuild rclnodejs
 ```
-
-4. If you get errors about missing ROS 2 packages, make sure you've sourced your workspace:
-
-```bash
-source ~/ros2_graph_ws/install/setup.bash
-```
-
-5. Check the browser console for any JavaScript errors
-6. Verify that the ROS 2 publisher node is running correctly
