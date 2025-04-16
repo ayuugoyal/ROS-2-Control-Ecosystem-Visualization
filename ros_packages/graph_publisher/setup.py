@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'topic_service_client'
+package_name = 'graph_publisher'
 
 setup(
     name=package_name,
@@ -13,14 +13,14 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='ayuugoyal',
+    maintainer='Ayush Goyal',
     maintainer_email='ayushgoyal8178@gmail.com',
-    description='A ROS 2 node that subscribes to topics and makes service calls',
+    description='ROS 2 Graph Publisher for Visualization',
     license='Apache License 2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'topic_service_client = topic_service_client.topic_service_client:main',
+            'graph_node = graph_publisher.graph_node:main',
         ],
     },
 )

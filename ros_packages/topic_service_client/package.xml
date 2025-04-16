@@ -4,7 +4,7 @@
   <name>topic_service_client</name>
   <version>0.0.1</version>
   <description>A ROS 2 node that subscribes to a topic and sends service requests</description>
-  <maintainer email="your-email@example.com">Your Name</maintainer>
+  <maintainer email="ayushgoyal8178@gmail.com">ayuugoyal</maintainer>
   <license>Apache License 2.0</license>
 
   <depend>rclpy</depend>
