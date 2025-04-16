@@ -1,3 +1,4 @@
+// components/ros2-connector.tsx
 "use client"
 
 import { useState } from "react"
@@ -6,6 +7,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { ConnectionData } from "@/types/ros2-types"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  fetchConnections,
+  callGetGraphService,
+  addConnection,
+  resetConnections
+} from "@/services/ros2-service"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface ROS2ConnectorProps {
   onConnectionUpdate: (connected: boolean) => void
@@ -14,7 +22,6 @@ interface ROS2ConnectorProps {
 
 export function ROS2Connector({ onConnectionUpdate, onNewConnection }: ROS2ConnectorProps) {
   const [isConnected, setIsConnected] = useState(false)
-  const [topicName, setTopicName] = useState("/graph_connections")
   const [serviceName, setServiceName] = useState("/get_graph")
   const [manualStart, setManualStart] = useState("")
   const [manualEnd, setManualEnd] = useState("")
@@ -22,83 +29,93 @@ export function ROS2Connector({ onConnectionUpdate, onNewConnection }: ROS2Conne
   const [stateInterface, setStateInterface] = useState(false)
   const [isHardware, setIsHardware] = useState(false)
   const [metadata, setMetadata] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Simulate connecting to ROS 2
+  // Clear error message after 5 seconds
+  const showError = (message: string) => {
+    setErrorMessage(message)
+    setTimeout(() => setErrorMessage(null), 5000)
+  }
+
+  // Connect to ROS 2 bridge
   const connectToROS = async () => {
     try {
-      // In a real implementation, this would use rclnodejs to connect to ROS 2
-      console.log("Connecting to ROS 2...")
+      setIsLoading(true)
+      setErrorMessage(null)
+      console.log("Connecting to ROS 2 bridge...")
 
-      // Simulate connection delay
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Test connection by fetching current connections
+      const connections = await fetchConnections()
 
       setIsConnected(true)
       onConnectionUpdate(true)
 
-      // Start simulated subscription
-      startSimulatedSubscription()
+      // Load initial connections
+      connections.forEach(connection => {
+        onNewConnection(connection)
+      })
 
-      console.log("Connected to ROS 2")
+      console.log("Connected to ROS 2 bridge")
     } catch (error) {
-      console.error("Failed to connect to ROS 2:", error)
+      console.error("Failed to connect to ROS 2 bridge:", error)
+      showError("Failed to connect to ROS 2 bridge. Is the server running?")
       setIsConnected(false)
       onConnectionUpdate(false)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const disconnectFromROS = () => {
-    setIsConnected(false)
-    onConnectionUpdate(false)
-    console.log("Disconnected from ROS 2")
-  }
-
-  const startSimulatedSubscription = () => {
-    // In a real implementation, this would subscribe to the actual ROS 2 topic
-    console.log(`Subscribing to topic: ${topicName}`)
+  const disconnectFromROS = async () => {
+    try {
+      setIsLoading(true)
+      setErrorMessage(null)
+      // Reset connections on disconnect
+      await resetConnections()
+      setIsConnected(false)
+      onConnectionUpdate(false)
+      console.log("Disconnected from ROS 2 bridge")
+    } catch (error) {
+      console.error("Error during disconnect:", error)
+      showError("Error during disconnect from ROS 2 bridge")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const callService = async () => {
-    // In a real implementation, this would call a ROS 2 service
-    console.log(`Calling service: ${serviceName}`)
+    if (!isConnected) return
 
-    // Simulate service response delay
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    try {
+      setIsLoading(true)
+      setErrorMessage(null)
+      console.log(`Calling service: ${serviceName}`)
 
-    // Simulate receiving graph data from service
-    const sampleConnections: ConnectionData[] = [
-      {
-        start: "controller_manager",
-        end: "joint_state_broadcaster",
-        commandInterface: true,
-        stateInterface: false,
-        isHardware: false,
-        metadata: "Controller Manager Connection",
-      },
-      {
-        start: "joint_state_broadcaster",
-        end: "hardware_interface",
-        commandInterface: false,
-        stateInterface: true,
-        isHardware: true,
-        metadata: "Hardware Interface Connection",
-      },
-      {
-        start: "controller_manager",
-        end: "position_controllers",
-        commandInterface: true,
-        stateInterface: false,
-        isHardware: false,
-        metadata: "Position Controller Connection",
-      },
-    ]
+      const connections = await callGetGraphService()
 
-    sampleConnections.forEach((connection) => {
-      onNewConnection(connection)
-    })
+      if (connections && connections.length > 0) {
+        connections.forEach(connection => {
+          onNewConnection(connection)
+        })
+        console.log(`Received ${connections.length} connections from service`)
+      } else {
+        console.log("No connections received from service")
+      }
+    } catch (error) {
+      console.error("Error calling service:", error)
+      showError(`Error calling ${serviceName} service`)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const addManualConnection = () => {
-    if (manualStart && manualEnd) {
+  const addManualConnection = async () => {
+    if (!isConnected || !manualStart || !manualEnd) return
+
+    try {
+      setIsLoading(true)
+      setErrorMessage(null)
       const newConnection: ConnectionData = {
         start: manualStart,
         end: manualEnd,
@@ -108,29 +125,36 @@ export function ROS2Connector({ onConnectionUpdate, onNewConnection }: ROS2Conne
         metadata: metadata || "User-defined connection",
       }
 
-      onNewConnection(newConnection)
+      const success = await addConnection(newConnection)
 
-      // Reset form
-      setManualStart("")
-      setManualEnd("")
-      setCommandInterface(false)
-      setStateInterface(false)
-      setIsHardware(false)
-      setMetadata("")
+      if (success) {
+        onNewConnection(newConnection)
+
+        // Reset form
+        setManualStart("")
+        setManualEnd("")
+        setCommandInterface(false)
+        setStateInterface(false)
+        setIsHardware(false)
+        setMetadata("")
+      } else {
+        showError("Failed to add connection")
+      }
+    } catch (error) {
+      console.error("Error adding manual connection:", error)
+      showError("Error adding manual connection")
+    } finally {
+      setIsLoading(false)
     }
   }
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="topic-name">Topic Name</Label>
-        <Input
-          id="topic-name"
-          value={topicName}
-          onChange={(e) => setTopicName(e.target.value)}
-          disabled={isConnected}
-        />
-      </div>
+      {errorMessage && (
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="service-name">Service Name</Label>
@@ -138,7 +162,7 @@ export function ROS2Connector({ onConnectionUpdate, onNewConnection }: ROS2Conne
           id="service-name"
           value={serviceName}
           onChange={(e) => setServiceName(e.target.value)}
-          disabled={isConnected}
+          disabled={isConnected || isLoading}
         />
       </div>
 
@@ -146,14 +170,20 @@ export function ROS2Connector({ onConnectionUpdate, onNewConnection }: ROS2Conne
         className="w-full"
         onClick={isConnected ? disconnectFromROS : connectToROS}
         variant={isConnected ? "destructive" : "default"}
+        disabled={isLoading}
       >
-        {isConnected ? "Disconnect" : "Connect to ROS 2"}
+        {isLoading ? "Processing..." : isConnected ? "Disconnect" : "Connect to ROS 2"}
       </Button>
 
       {isConnected && (
         <>
-          <Button className="w-full mt-2" onClick={callService} variant="outline">
-            Call Service
+          <Button
+            className="w-full mt-2"
+            onClick={callService}
+            variant="outline"
+            disabled={isLoading}
+          >
+            {isLoading ? "Loading..." : "Call Service"}
           </Button>
 
           <div className="border-t pt-4 mt-4">
@@ -166,6 +196,7 @@ export function ROS2Connector({ onConnectionUpdate, onNewConnection }: ROS2Conne
                 value={manualStart}
                 onChange={(e) => setManualStart(e.target.value)}
                 placeholder="e.g., controller_manager"
+                disabled={isLoading}
               />
             </div>
 
@@ -176,6 +207,7 @@ export function ROS2Connector({ onConnectionUpdate, onNewConnection }: ROS2Conne
                 value={manualEnd}
                 onChange={(e) => setManualEnd(e.target.value)}
                 placeholder="e.g., joint_state_broadcaster"
+                disabled={isLoading}
               />
             </div>
 
@@ -184,6 +216,7 @@ export function ROS2Connector({ onConnectionUpdate, onNewConnection }: ROS2Conne
                 id="command-interface"
                 checked={commandInterface}
                 onCheckedChange={(checked) => setCommandInterface(checked as boolean)}
+                disabled={isLoading}
               />
               <Label htmlFor="command-interface">Command Interface</Label>
             </div>
@@ -193,6 +226,7 @@ export function ROS2Connector({ onConnectionUpdate, onNewConnection }: ROS2Conne
                 id="state-interface"
                 checked={stateInterface}
                 onCheckedChange={(checked) => setStateInterface(checked as boolean)}
+                disabled={isLoading}
               />
               <Label htmlFor="state-interface">State Interface</Label>
             </div>
@@ -202,6 +236,7 @@ export function ROS2Connector({ onConnectionUpdate, onNewConnection }: ROS2Conne
                 id="is-hardware"
                 checked={isHardware}
                 onCheckedChange={(checked) => setIsHardware(checked as boolean)}
+                disabled={isLoading}
               />
               <Label htmlFor="is-hardware">Is Hardware</Label>
             </div>
@@ -213,10 +248,15 @@ export function ROS2Connector({ onConnectionUpdate, onNewConnection }: ROS2Conne
                 value={metadata}
                 onChange={(e) => setMetadata(e.target.value)}
                 placeholder="Additional information"
+                disabled={isLoading}
               />
             </div>
 
-            <Button className="w-full mt-4" onClick={addManualConnection} disabled={!manualStart || !manualEnd}>
+            <Button
+              className="w-full mt-4"
+              onClick={addManualConnection}
+              disabled={!manualStart || !manualEnd || isLoading}
+            >
               Add Connection
             </Button>
           </div>
@@ -225,5 +265,3 @@ export function ROS2Connector({ onConnectionUpdate, onNewConnection }: ROS2Conne
     </div>
   )
 }
-
-
