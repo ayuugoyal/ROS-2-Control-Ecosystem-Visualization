@@ -4,26 +4,6 @@ A visualization tool for ROS 2 control systems that displays the connections bet
 
 ## Architecture
 
-1)
-```mermaid
-flowchart 
-    pub[Topic Publisher]
-     
-    subgraph ROS2_System
-        topic((input_topic))
-        service{add_two_ints}
-        client[topic_service_client Node]
-        server[service_provider Node]
-    end
-    
-    pub -->|publishes String| topic
-    topic -->|subscribes| client
-    client -->|requests| service
-    service -->|provides| server
-    server -->|responds| client
-    
-```
-2)
 ```mermaid
 graph TD
     A[ROS 2 Control] --> B(Data Collection);
